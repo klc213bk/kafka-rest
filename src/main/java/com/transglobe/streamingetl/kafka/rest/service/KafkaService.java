@@ -98,6 +98,7 @@ public class KafkaService {
 	@PreDestroy
 	public void destroy() {
 		LOG.info(">>>> PreDestroy Kafka Service....");
+		destroyKafka();
 		destroyZookeeper();
 	}
 
@@ -253,7 +254,6 @@ public class KafkaService {
 				int exitVal = kafkaStopProcess.waitFor();
 				if (exitVal == 0) {
 					LOG.info(">>> Success!!! stopKafka, exitVal={}", exitVal);
-					kafkaStopFinished.set(true);
 				} else {
 					LOG.error(">>> Error!!! stopKafka, exitcode={}", exitVal);
 					kafkaStopFinished.set(true);
