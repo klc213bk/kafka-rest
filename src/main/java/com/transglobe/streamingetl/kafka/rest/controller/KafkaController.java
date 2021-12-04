@@ -123,46 +123,7 @@ public class KafkaController {
 		
 		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
 	}
-	@PostMapping(path="/createTopic/{topic}", produces=MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<Object> createTopic(@PathVariable("topic") String topic) {
-		logger.info(">>>>controller createTopic/{} is called", topic);
-		
-		ObjectNode objectNode = mapper.createObjectNode();
-		
-		try {
-			kafkaService.createTopic(topic);
-			objectNode.put("returnCode", "0000");
-		} catch (Exception e) {
-			objectNode.put("returnCode", "-9999");
-			objectNode.put("errMsg", ExceptionUtils.getMessage(e));
-			objectNode.put("returnCode", ExceptionUtils.getStackTrace(e));
-		}
-		
-		logger.info(">>>>controller createTopic finished ");
-		
-		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
-	}
-	@PostMapping(path="/deleteTopic/{topic}", produces=MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<Object> deleteTopic(@PathVariable("topic") String topic) {
-		logger.info(">>>>controller deleteTopic/{} is called", topic);
-		
-		ObjectNode objectNode = mapper.createObjectNode();
-		
-		try {
-			kafkaService.deleteTopic(topic);
-			objectNode.put("returnCode", "0000");
-		} catch (Exception e) {
-			objectNode.put("returnCode", "-9999");
-			objectNode.put("errMsg", ExceptionUtils.getMessage(e));
-			objectNode.put("returnCode", ExceptionUtils.getStackTrace(e));
-		}
-		
-		logger.info(">>>>controller createTopic finished ");
-		
-		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
-	}
+	
 	@GetMapping(path="/zookeeper/alive", produces=MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<Object> isZookeeperAlive() {
@@ -205,43 +166,43 @@ public class KafkaController {
 		
 		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
 	}
-	@GetMapping(path="/listTopics", produces=MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<Object> listTopics() {
-		logger.info(">>>>controller listTopics is called");
-		
-		ObjectNode objectNode = mapper.createObjectNode();
-	
-		try {
-			List<String> topics = kafkaService.listTopics();
-			String jsonStr = writeListToJsonString(topics);
-			
-			mapper.createArrayNode().add("ggg");
-			objectNode.put("returnCode", "0000");
-			objectNode.put("topics", jsonStr);
-		} catch (Exception e) {
-			objectNode.put("returnCode", "-9999");
-			objectNode.put("errMsg", ExceptionUtils.getMessage(e));
-			objectNode.put("returnCode", ExceptionUtils.getStackTrace(e));
-		}
-		
-		logger.info(">>>>controller listTopics finished ");
-		
-		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
-	}
-	
-	public String writeListToJsonString(List<String> list) throws IOException {  
-	  
-	    final ByteArrayOutputStream out = new ByteArrayOutputStream();
-	    final ObjectMapper mapper = new ObjectMapper();
-
-	    mapper.writeValue(out, list);
-
-	    final byte[] data = out.toByteArray();
-	    
-	    return new String(data);
-	    
-	}
+//	@GetMapping(path="/listTopics", produces=MediaType.APPLICATION_JSON_VALUE)
+//	@ResponseBody
+//	public ResponseEntity<Object> listTopics() {
+//		logger.info(">>>>controller listTopics is called");
+//		
+//		ObjectNode objectNode = mapper.createObjectNode();
+//	
+//		try {
+//			List<String> topics = kafkaService.listTopics();
+//			String jsonStr = writeListToJsonString(topics);
+//			
+//			mapper.createArrayNode().add("ggg");
+//			objectNode.put("returnCode", "0000");
+//			objectNode.put("topics", jsonStr);
+//		} catch (Exception e) {
+//			objectNode.put("returnCode", "-9999");
+//			objectNode.put("errMsg", ExceptionUtils.getMessage(e));
+//			objectNode.put("returnCode", ExceptionUtils.getStackTrace(e));
+//		}
+//		
+//		logger.info(">>>>controller listTopics finished ");
+//		
+//		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
+//	}
+//	
+//	public String writeListToJsonString(List<String> list) throws IOException {  
+//	  
+//	    final ByteArrayOutputStream out = new ByteArrayOutputStream();
+//	    final ObjectMapper mapper = new ObjectMapper();
+//
+//	    mapper.writeValue(out, list);
+//
+//	    final byte[] data = out.toByteArray();
+//	    
+//	    return new String(data);
+//	    
+//	}
 	//	@PostMapping(path="/startZookeeper", produces=MediaType.APPLICATION_JSON_VALUE)
 	//	@ResponseBody
 	//	public ResponseEntity<Object> startZookeeper() {
