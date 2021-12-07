@@ -11,11 +11,13 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +47,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.transglobe.streamingetl.kafka.rest.bean.LastLogminerScn;
 
 @Service
 public class KafkaService {
@@ -58,43 +61,43 @@ public class KafkaService {
 
 	@Value("${zookeeper.start.properties}")
 	private String zookeeperStartProperties;
-	
+
 	@Value("${zookeeper.stop.script}")
 	private String zookeeperStopScript;
 
 	@Value("${kafka.start.script}")
 	private String kafkaStartScript;
-	
+
 	@Value("${kafka.start.properties}")
 	private String kafkaStartProperties;
-	
+
 	@Value("${kafka.stop.script}")
 	private String kafkaStopScript;
-	
+
 	@Value("${kafka.topics.script}")
 	private String kafkaTopicsScript;
-	
+
 	@Value("${kafka.bootstrap.server}")
 	private String kafkaBootstrapServer;
-	
+
 	private Process zookeeperStartProcess;
 	private ExecutorService zookeeperStartExecutor;
 	private AtomicBoolean zookeeperStartFinished = new AtomicBoolean(false);
 	private AtomicBoolean zookeeperStopFinished = new AtomicBoolean(false);
 	private Process zookeeperStopProcess;
-	
+
 	private Process kafkaStartProcess;
 	private ExecutorService kafkaStartExecutor;
 	private AtomicBoolean kafkaStartFinished = new AtomicBoolean(false);
 	private AtomicBoolean kafkaStopFinished = new AtomicBoolean(false);
 	private Process kafkaStopProcess;
-	
+
 	private Process listTopicsProcess;
-	
+
 	private Process createTopicProcess;
-	
+
 	private Process deleteTopicProcess;
-	
+
 	@PreDestroy
 	public void destroy() {
 		LOG.info(">>>> PreDestroy Kafka Service....");
@@ -123,7 +126,7 @@ public class KafkaService {
 					public void run() {
 						BufferedReader reader = new BufferedReader(new InputStreamReader(zookeeperStartProcess.getInputStream()));
 						reader.lines().forEach(line -> {
-//							LOG.info("********"+line);
+							//							LOG.info("********"+line);
 							if (line.contains("Using checkIntervalMs")) {
 								zookeeperStartFinished.set(true);
 								LOG.info("********   zookeeperStartFinished set true");
@@ -137,7 +140,7 @@ public class KafkaService {
 					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
 					Thread.sleep(1000);
 				}
-				
+
 				LOG.info(">>>>>>>>>>>> KafkaService.startZookeeper End");
 			} else {
 				LOG.warn(" >>> zookeeperStartProcess is currently Running.");
@@ -186,7 +189,7 @@ public class KafkaService {
 					Thread.sleep(1000);
 				}
 
-				
+
 				LOG.info(">>>>>>>>>>>> KafkaService.startKafka End");
 			} else {
 				LOG.warn(" >>> kafkaStartProcess is currently Running.");
@@ -223,7 +226,7 @@ public class KafkaService {
 					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
 					Thread.sleep(1000);
 				}
-				
+
 				if (!zookeeperStopProcess.isAlive()) {
 					zookeeperStopProcess.destroy();
 				}
@@ -258,7 +261,7 @@ public class KafkaService {
 					LOG.error(">>> Error!!! stopKafka, exitcode={}", exitVal);
 					kafkaStopFinished.set(true);
 				}
-				
+
 				while (!kafkaStopFinished.get()) {
 					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
 					Thread.sleep(1000);
@@ -267,7 +270,7 @@ public class KafkaService {
 				if (!kafkaStopProcess.isAlive()) {
 					kafkaStopProcess.destroy();
 				}
-				
+
 				LOG.info(">>>>>>>>>>>> KafkaService.stopKafka End");
 			} else {
 				LOG.warn(" >>> kafkaStopProcess is currently Running.");
@@ -336,7 +339,7 @@ public class KafkaService {
 
 			}
 		}
-		
+
 	}
 	private void destroyKafka() {
 		if (kafkaStartProcess != null) {
@@ -379,16 +382,261 @@ public class KafkaService {
 
 			}
 		}
-		
+
+	}
+
+	public Set<String> listTopics() throws Exception {
+		LOG.info(">>>>>>>>>>>> listTopics ");
+		List<String> topics = new ArrayList<String>();
+		try {
+			if (listTopicsProcess == null || !listTopicsProcess.isAlive()) {
+				ProcessBuilder builder = new ProcessBuilder();
+				String script = "./bin/kafka-topics.sh" + " --list --bootstrap-server " + kafkaBootstrapServer;
+				builder.command("sh", "-c", script);
+				//				builder.command(kafkaTopicsScript + " --list --bootstrap-server " + kafkaBootstrapServer);
+
+				//				builder.command(kafkaTopicsScript, "--list", "--bootstrap-server", kafkaBootstrapServer);
+
+				builder.directory(new File(kafkaServerHome));
+				listTopicsProcess = builder.start();
+
+				ExecutorService listTopicsExecutor = Executors.newSingleThreadExecutor();
+				listTopicsExecutor.submit(new Runnable() {
+
+					@Override
+					public void run() {
+						BufferedReader reader = new BufferedReader(new InputStreamReader(listTopicsProcess.getInputStream()));
+						reader.lines().forEach(topic -> topics.add(topic));
+					}
+
+				});
+				int exitVal = listTopicsProcess.waitFor();
+				if (exitVal == 0) {
+
+					LOG.info(">>> Success!!! listTopics, exitVal={}", exitVal);
+				} else {
+					LOG.error(">>> Error!!! listTopics, exitcode={}", exitVal);
+					String errStr = (topics.size() > 0)? topics.get(0) : "";
+					throw new Exception(errStr);
+				}
+
+
+			} else {
+				LOG.warn(" >>> listTopics is currently Running.");
+			}
+		} catch (IOException e) {
+			LOG.error(">>> Error!!!, listTopics, msg={}, stacktrace={}", ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+			throw e;
+		} catch (InterruptedException e) {
+			LOG.error(">>> Error!!!, listTopics, msg={}, stacktrace={}", ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+			throw e;
+		}
+		return new HashSet<>(topics);
+	}
+
+	public void createTopic(String topic) throws Exception {
+		LOG.info(">>>>>>>>>>>> createTopic topic=={}", topic);
+		try {
+			if (createTopicProcess == null || !createTopicProcess.isAlive()) {
+				ProcessBuilder builder = new ProcessBuilder();
+				String script = "./bin/kafka-topics.sh --create --bootstrap-server " + kafkaBootstrapServer + " --replication-factor 1 --partitions 1 --topic " + topic;
+				builder.command("sh", "-c", script);
+
+				builder.directory(new File(kafkaServerHome));
+				createTopicProcess = builder.start();
+
+				int exitVal = createTopicProcess.waitFor();
+				if (exitVal == 0) {
+					LOG.info(">>> Success!!! createTopic:{}, exitcode={}", topic, exitVal);
+				} else {
+					LOG.error(">>> Error!!! createTopic:{}, exitcode={}", topic, exitVal);
+				}
+				LOG.info(">>> createTopicProcess isalive={}", createTopicProcess.isAlive());
+				if (!createTopicProcess.isAlive()) {
+					createTopicProcess.destroy();
+				}
+
+
+				//				if (!createTopicProcess.isAlive()) {
+				//					LOG.info(">>>  createTopicProcess isAlive={}", createTopicProcess.isAlive());
+				//					createTopicExecutor.shutdown();
+				//					if (!createTopicExecutor.isTerminated()) {
+				//						LOG.info(">>> createTopicExecutor is not Terminated, prepare to shutdown executor");
+				//						createTopicExecutor.shutdownNow();
+				//
+				//						try {
+				//							createTopicExecutor.awaitTermination(600, TimeUnit.SECONDS);
+				//						} catch (InterruptedException e) {
+				//							LOG.error(">>> ERROR!!!, msg={}, stacetrace={}",
+				//									ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+				//						}
+				//
+				//					} else {
+				//						LOG.warn(">>> createTopicExecutor is already terminated");
+				//					}
+				//				} else {
+				//					LOG.info(">>>  createTopicProcess isAlive={}, destroy it", createTopicProcess.isAlive());
+				//					createTopicProcess.destroy();
+				//				}
+
+			} else {
+				LOG.warn(" >>> createTopic is currently Running.");
+			}
+		} catch (IOException e) {
+			LOG.error(">>> Error!!!, createTopic, msg={}, stacktrace={}", ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+			throw e;
+		} catch (InterruptedException e) {
+			LOG.error(">>> Error!!!, createTopic, msg={}, stacktrace={}", ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+			throw e;
+		} 
+	}
+	public void deleteTopic(String topic) throws Exception {
+		LOG.info(">>>>>>>>>>>> deleteTopic topic=={}", topic);
+		try {
+			if (deleteTopicProcess == null || !deleteTopicProcess.isAlive()) {
+				ProcessBuilder builder = new ProcessBuilder();
+				String script = "./bin/kafka-topics.sh --delete --bootstrap-server " + kafkaBootstrapServer + " --topic " + topic;
+				builder.command("sh", "-c", script);
+
+				builder.directory(new File(kafkaServerHome));
+				deleteTopicProcess = builder.start();
+
+				int exitVal = deleteTopicProcess.waitFor();
+				if (exitVal == 0) {
+					LOG.info(">>> Success!!! deleteTopic:{}, exitcode={}", topic, exitVal);
+				} else {
+					LOG.error(">>> Error!!! deleteTopic:{}, exitcode={}", topic, exitVal);
+				}
+				LOG.info(">>> deleteTopicProcess isalive={}", deleteTopicProcess.isAlive());
+				if (!deleteTopicProcess.isAlive()) {
+					deleteTopicProcess.destroy();
+				}
+
+
+				//				if (!createTopicProcess.isAlive()) {
+				//					LOG.info(">>>  createTopicProcess isAlive={}", createTopicProcess.isAlive());
+				//					createTopicExecutor.shutdown();
+				//					if (!createTopicExecutor.isTerminated()) {
+				//						LOG.info(">>> createTopicExecutor is not Terminated, prepare to shutdown executor");
+				//						createTopicExecutor.shutdownNow();
+				//
+				//						try {
+				//							createTopicExecutor.awaitTermination(600, TimeUnit.SECONDS);
+				//						} catch (InterruptedException e) {
+				//							LOG.error(">>> ERROR!!!, msg={}, stacetrace={}",
+				//									ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+				//						}
+				//
+				//					} else {
+				//						LOG.warn(">>> createTopicExecutor is already terminated");
+				//					}
+				//				} else {
+				//					LOG.info(">>>  createTopicProcess isAlive={}, destroy it", createTopicProcess.isAlive());
+				//					createTopicProcess.destroy();
+				//				}
+
+			} else {
+				LOG.warn(" >>> deleteTopic is currently Running.");
+			}
+		} catch (IOException e) {
+			LOG.error(">>> Error!!!, deleteTopic, msg={}, stacktrace={}", ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+			throw e;
+		} catch (InterruptedException e) {
+			LOG.error(">>> Error!!!, deleteTopic, msg={}, stacktrace={}", ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
+			throw e;
+		} 
+	}
+
+
+	public Optional<LastLogminerScn> getEbaoKafkaLastLogminerScn() {
+		LOG.info(">>>>>kafkaBootstrapServer={}",kafkaBootstrapServer);
+		Consumer<String, String> consumer = createConsumer(kafkaBootstrapServer, "ebao-getLogminerLastScn");
+
+		LastLogminerScn lastLogminer = null;
+		List<TopicPartition> tps = new ArrayList<>();
+		Map<String, List<PartitionInfo>> map = consumer.listTopics();
+		for (String topic : map.keySet()) {	
+			if (topic.startsWith("EBAOPRD1")) {
+				for (PartitionInfo pi : map.get(topic)) {
+					tps.add(new TopicPartition(pi.topic(), pi.partition()));
+				}
+
+			}
+		}
+		consumer.assign( tps);
+
+		long lastScn = 0L;
+		long lastCommitScn = 0L;
+		Map<TopicPartition, Long> offsetMap = consumer.endOffsets(tps);
+		for (TopicPartition tp : offsetMap.keySet()) {
+			//			long position = consumer.position(tp);
+			long offset = offsetMap.get(tp);
+
+			if (offset == 0) {
+				continue;
+			}
+			LOG.info("topic:{}, partition:{},offset:{}", tp.topic(), tp.partition(), offset);
+			consumer.seek(tp, offset- 1);
+
+			ConsumerRecords<String, String> consumerRecords = consumer.poll(Duration.ofMillis(1000));
+			System.out.println("record count:" + consumerRecords.count());
+
+			for (ConsumerRecord<String, String> record : consumerRecords) {
+				LOG.info("record key:{}, topic:{}, partition:{},offset:{}, timestamp:{}",
+						record.key(), record.topic(), record.partition(), record.offset(), record.timestamp());
+				//				System.out.println("Record Key " + record.key());
+				//				System.out.println("Record value " + record.value());
+				//				System.out.println("Record topic " + record.topic() + " partition " + record.partition());
+				//				System.out.println("Record offset " + record.offset() + " timestamp " + record.timestamp());
+
+				ObjectMapper objectMapper = new ObjectMapper();
+				objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+				try {
+					JsonNode jsonNode = objectMapper.readTree(record.value());
+					JsonNode payload = jsonNode.get("payload");
+					//	payloadStr = payload.toString();
+
+					String operation = payload.get("OPERATION").asText();
+					String tableName = payload.get("TABLE_NAME").asText();
+					Long scn = Long.valueOf(payload.get("SCN").asText());
+					Long commitScn = Long.valueOf(payload.get("COMMIT_SCN").asText());
+					String rowId = payload.get("ROW_ID").asText();
+					Long t = Long.valueOf(payload.get("TIMESTAMP").asText());
+					LOG.info("operation:{},tableName:{},scn:{}, commitScn:{}, rowId:{},timestamp",operation,tableName,scn,commitScn,rowId,t);
+
+					if (scn.longValue() > lastScn) {
+						lastScn = scn.longValue();
+					}
+					if (commitScn.longValue() > lastCommitScn) {
+						lastCommitScn = commitScn.longValue();
+					}
+				} catch(Exception e) {
+					e.printStackTrace();
+				} 
+			}
+
+		}
+		consumer.close();
+
+		lastLogminer = new LastLogminerScn(lastScn, lastCommitScn);
+		return Optional.of(lastLogminer);
+	}
+	
+	private Consumer<String, String> createConsumer(String kafkaBootstrapServer, String kafkaGroupId) {
+		Properties props = new Properties();
+		props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServer);
+		props.put(ConsumerConfig.GROUP_ID_CONFIG, kafkaGroupId);
+		props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+		props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+
+		Consumer<String, String> consumer = new KafkaConsumer<>(props);
+
+		return consumer;
 	}
 	
 	
-	
-	
-	
 }
-
-
 //	@Value("${kafka.home}")
 //	private String kafkaHome;
 //

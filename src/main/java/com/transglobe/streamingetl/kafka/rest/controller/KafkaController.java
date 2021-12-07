@@ -4,8 +4,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
@@ -29,7 +31,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.transglobe.streamingetl.kafka.rest.bean.LastLogminerScn;
 import com.transglobe.streamingetl.kafka.rest.service.KafkaService;
+import com.transglobe.streamingetl.kafka.rest.util.HttpUtils;
 
 
 @RestController
@@ -166,198 +170,117 @@ public class KafkaController {
 		
 		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
 	}
-//	@GetMapping(path="/listTopics", produces=MediaType.APPLICATION_JSON_VALUE)
-//	@ResponseBody
-//	public ResponseEntity<Object> listTopics() {
-//		logger.info(">>>>controller listTopics is called");
-//		
-//		ObjectNode objectNode = mapper.createObjectNode();
-//	
-//		try {
-//			List<String> topics = kafkaService.listTopics();
-//			String jsonStr = writeListToJsonString(topics);
-//			
-//			mapper.createArrayNode().add("ggg");
-//			objectNode.put("returnCode", "0000");
-//			objectNode.put("topics", jsonStr);
-//		} catch (Exception e) {
-//			objectNode.put("returnCode", "-9999");
-//			objectNode.put("errMsg", ExceptionUtils.getMessage(e));
-//			objectNode.put("returnCode", ExceptionUtils.getStackTrace(e));
-//		}
-//		
-//		logger.info(">>>>controller listTopics finished ");
-//		
-//		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
-//	}
-//	
-//	public String writeListToJsonString(List<String> list) throws IOException {  
-//	  
-//	    final ByteArrayOutputStream out = new ByteArrayOutputStream();
-//	    final ObjectMapper mapper = new ObjectMapper();
-//
-//	    mapper.writeValue(out, list);
-//
-//	    final byte[] data = out.toByteArray();
-//	    
-//	    return new String(data);
-//	    
-//	}
-	//	@PostMapping(path="/startZookeeper", produces=MediaType.APPLICATION_JSON_VALUE)
-	//	@ResponseBody
-	//	public ResponseEntity<Object> startZookeeper() {
-	//		logger.info(">>>>startZookeeper");
-	//		long t0 = System.currentTimeMillis();
-	//
-	//		
-	//		String errMsg = null;
-	//		String returnCode = "0000";
-	//		try {
-	//			kafkaService.startZookeeper();
-	//		} catch (Exception e) {
-	//			returnCode = "-9999";
-	//			errMsg = ExceptionUtils.getMessage(e);
-	//			logger.error(">>>errMsg:{}, stacktrace={}", errMsg, ExceptionUtils.getStackTrace(e));
-	//		}
-	//
-	//		long t1 = System.currentTimeMillis();
-	//
-	//		logger.info(">>>>startZookeeper finished returnCode={}, span={}", returnCode, (t1 - t0));
-	//
-	//		return ResponseEntity.status(HttpStatus.OK).body(new Response(returnCode, errMsg));
-	//
-	//	}
-	//	@PostMapping(value="/stopZookeeper")
-	//	@ResponseBody
-	//	public ResponseEntity<Response> stopZookeeper() {
-	//		logger.info(">>>>stopZookeeper");
-	//		long t0 = System.currentTimeMillis();
-	//
-	//		String errMsg = null;
-	//		String returnCode = "0000";
-	//		try {
-	//			kafkaService.stopZookeeper();
-	//		} catch (Exception e) {
-	//			returnCode = "-9999";
-	//			errMsg = ExceptionUtils.getMessage(e);
-	//			logger.error(">>>errMsg:{}, stacktrace={}", errMsg, ExceptionUtils.getStackTrace(e));
-	//		}
-	//
-	//		long t1 = System.currentTimeMillis();
-	//
-	//		logger.info(">>>>stopZookeeper finished returnCode={}, span={}", returnCode, (t1 - t0));
-	//
-	//		return ResponseEntity.status(HttpStatus.OK).body(new Response(returnCode, errMsg));
-	//
-	//	}
+	@GetMapping(path="/listTopics", produces=MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Object> listTopics() {
+		logger.info(">>>>controller listTopics is called");
+		
+		ObjectNode objectNode = mapper.createObjectNode();
+	
+		try {
+			Set<String> topics = kafkaService.listTopics();
+			List<String> topicList = new ArrayList<>();
+			for (String t : topics) {
+				topicList.add(t);
+			}
+			String jsonStr = HttpUtils.writeListToJsonString(topicList);
+			
+			objectNode.put("returnCode", "0000");
+			objectNode.put("topics", jsonStr);
+		} catch (Exception e) {
+			String errMsg = ExceptionUtils.getMessage(e);
+			String stackTrace = ExceptionUtils.getStackTrace(e);
+			objectNode.put("returnCode", "-9999");
+			objectNode.put("errMsg", errMsg);
+			objectNode.put("returnCode", stackTrace);
+			logger.error(">>> errMsg={}, stacktrace={}",errMsg,stackTrace);
+		}
+		
+		logger.info(">>>>controller listTopics finished ");
+		
+		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
+	}
+	@PostMapping(path="/createTopic/{topic}", produces=MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Object> createTopic(@PathVariable("topic") String topic) {
+		logger.info(">>>>controller createTopic is called");
+		
+		ObjectNode objectNode = mapper.createObjectNode();
+	
+		try {
+			kafkaService.createTopic(topic);
+			
+			objectNode.put("returnCode", "0000");
+		} catch (Exception e) {
+			String errMsg = ExceptionUtils.getMessage(e);
+			String stackTrace = ExceptionUtils.getStackTrace(e);
+			objectNode.put("returnCode", "-9999");
+			objectNode.put("errMsg", errMsg);
+			objectNode.put("returnCode", stackTrace);
+			logger.error(">>> errMsg={}, stacktrace={}",errMsg,stackTrace);
+		}
+		
+		logger.info(">>>>controller createTopic finished ");
+		
+		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
+	}
+	@PostMapping(path="/deleteTopic/{topic}", produces=MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Object> deleteTopic(@PathVariable("topic") String topic) {
+		logger.info(">>>>controller deleteTopic is called");
+		
+		ObjectNode objectNode = mapper.createObjectNode();
+	
+		try {
+			kafkaService.deleteTopic(topic);
+			
+			objectNode.put("returnCode", "0000");
+		} catch (Exception e) {
+			String errMsg = ExceptionUtils.getMessage(e);
+			String stackTrace = ExceptionUtils.getStackTrace(e);
+			objectNode.put("returnCode", "-9999");
+			objectNode.put("errMsg", errMsg);
+			objectNode.put("returnCode", stackTrace);
+			logger.error(">>> errMsg={}, stacktrace={}",errMsg,stackTrace);
+		}
+		
+		logger.info(">>>>controller deleteTopic finished ");
+		
+		return new ResponseEntity<Object>(objectNode, HttpStatus.OK);
+	}
+	@GetMapping(value="/lastLogminerScn")
+	@ResponseBody
+	public ResponseEntity<LastLogminerScn> getEbaoKafkaLastLogminerScn(){
+		logger.info(">>>>getKafkaLastLogminerScn begin");
+		long t0 = System.currentTimeMillis();
+		String errMsg = null;
+		String returnCode = "0000";
+		Optional<LastLogminerScn> logminerLastScn = null;
+		try {
+			logminerLastScn = kafkaService.getEbaoKafkaLastLogminerScn();
+			logger.info("    >>>>getKafkaLastLogminerScn finished.");
 
-	//
-	//	@GetMapping(value="/listTopics")
-	//	@ResponseBody
-	//	public ResponseEntity<List<String>> listKafkaTopics() {
-	//		logger.info(">>>>listTopics");
-	//		long t0 = System.currentTimeMillis();
-	//		String errMsg = null;
-	//		String returnCode = "0000";
-	//		List<String> topics = null;
-	//		try {
-	//			topics = kafkaService.listTopics();
-	//		} catch (Exception e) {
-	//			returnCode = "-9999";
-	//			errMsg = ExceptionUtils.getMessage(e);
-	//			logger.error(">>>errMsg:{}, stacktrace={}", errMsg, ExceptionUtils.getStackTrace(e));
-	//		}
-	//
-	//		long t1 = System.currentTimeMillis();
-	//
-	//		logger.info(">>>>listTopics finished returnCode={}, span={}", returnCode, (t1 - t0));
-	//
-	//		return ResponseEntity.status(HttpStatus.OK).body(topics);
-	//
-	//	}
-	//
-	//	@PostMapping(value="/deleteTopic/{topic}")
-	//	@ResponseBody
-	//	public ResponseEntity<Response> deleteTopic(@PathVariable("topic") String topic) {
-	//		logger.info(">>>>deleteTopic");
-	//		long t0 = System.currentTimeMillis();
-	//		String errMsg = null;
-	//		String returnCode = "0000";
-	//		try {
-	//			kafkaService.deleteTopic(topic);
-	//
-	//		} catch (Exception e) {
-	//			returnCode = "-9999";
-	//			errMsg = ExceptionUtils.getMessage(e);
-	//			logger.error(">>>errMsg:{}, stacktrace={}", errMsg, ExceptionUtils.getStackTrace(e));
-	//		}
-	//
-	//		long t1 = System.currentTimeMillis();
-	//
-	//		logger.info(">>>>deleteTopic finished returnCode={}, span={}", returnCode, (t1 - t0));
-	//
-	//		return ResponseEntity.status(HttpStatus.OK).body(new Response(returnCode, errMsg));
-	//
-	//	}
-	//
-	//	// error return
-	//	// {"timestamp":"2021-11-04T06:45:05.614+00:00","status":500,"error":"Internal Server Error","message":"","path":"/streamingetl/kafka/createTopic/EBAOPRD1.LS_EBAO.T_ADDRESS"}
-	//	@PostMapping(value="/createTopic/{topic}")
-	//	@ResponseBody
-	//	public ResponseEntity<Response> createTopic(@PathVariable("topic") String topic) {
-	//		logger.info(">>>>createTopic");
-	//		long t0 = System.currentTimeMillis();
-	//		String errMsg = null;
-	//		String returnCode = "0000";
-	//		try {
-	//			kafkaService.createTopic(topic);
-	//
-	//		} catch (Exception e) {
-	//			returnCode = "-9999";
-	//			errMsg = ExceptionUtils.getMessage(e);
-	//			logger.error(">>>errMsg:{}, stacktrace={}", errMsg, ExceptionUtils.getStackTrace(e));
-	//		}
-	//
-	//		long t1 = System.currentTimeMillis();
-	//
-	//		logger.info(">>>>createTopic finished returnCode={}, span={}", returnCode, (t1 - t0));
-	//
-	//		return ResponseEntity.status(HttpStatus.OK).body(new Response(returnCode, errMsg));
-	//
-	//	}
-	//
-	//	@GetMapping(value="/lastLogminerScn")
-	//	@ResponseBody
-	//	public ResponseEntity<LastLogminerScn> getKafkaLastLogminerScn(){
-	//		logger.info(">>>>getKafkaLastLogminerScn begin");
-	//		long t0 = System.currentTimeMillis();
-	//		String errMsg = null;
-	//		String returnCode = "0000";
-	//		Optional<LastLogminerScn> logminerLastScn = null;
-	//		try {
-	//			logminerLastScn = kafkaService.getKafkaLastLogminerScn();
-	//			logger.info("    >>>>getKafkaLastLogminerScn finished.");
-	//
-	//			if (logminerLastScn.isPresent()) {
-	//				return new ResponseEntity<>(logminerLastScn.get(), HttpStatus.OK);
-	//			} else {
-	//				throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-	//			}
-	//		} catch (Exception e) {
-	//			returnCode = "-9999";
-	//			errMsg = ExceptionUtils.getMessage(e);
-	//			logger.error(">>>errMsg:{}, stacktrace={}", errMsg, ExceptionUtils.getStackTrace(e));
-	//		}
-	//
-	//		long t1 = System.currentTimeMillis();
-	//
-	//		logger.info(">>>>getKafkaLastLogminerScn finished returnCode={}, span={}", returnCode, (t1 - t0));
-	//
-	//		return ResponseEntity.status(HttpStatus.OK).body(logminerLastScn.get());
-	//
-	//	}
-	//
-	//
+			if (logminerLastScn.isPresent()) {
+				return new ResponseEntity<>(logminerLastScn.get(), HttpStatus.OK);
+			} else {
+				throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+			}
+		} catch (Exception e) {
+			returnCode = "-9999";
+			errMsg = ExceptionUtils.getMessage(e);
+			logger.error(">>>errMsg:{}, stacktrace={}", errMsg, ExceptionUtils.getStackTrace(e));
+		}
+
+		long t1 = System.currentTimeMillis();
+
+		logger.info(">>>>getKafkaLastLogminerScn finished returnCode={}, span={}", returnCode, (t1 - t0));
+
+		return ResponseEntity.status(HttpStatus.OK).body(logminerLastScn.get());
+
+	}
+
+
+	
 	//	@GetMapping(value="/connectors")
 	//	@ResponseBody
 	//	public ResponseEntity<List<String>> connectors() {
