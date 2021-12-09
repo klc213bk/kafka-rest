@@ -261,10 +261,16 @@ public class KafkaService {
 					LOG.error(">>> Error!!! stopKafka, exitcode={}", exitVal);
 					kafkaStopFinished.set(true);
 				}
-
+				long t0 = System.currentTimeMillis();
 				while (!kafkaStopFinished.get()) {
 					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
 					Thread.sleep(1000);
+					
+					long t1 = System.currentTimeMillis();
+					
+					if ((t1 - t0) > 60 * 1000) {
+						break;
+					}
 				}
 
 				if (!kafkaStopProcess.isAlive()) {
