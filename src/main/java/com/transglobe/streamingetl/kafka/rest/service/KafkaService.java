@@ -366,7 +366,7 @@ public class KafkaService {
 
 			}
 		}
-		LOG.warn(" >>> kafkaStartExecutor ...", zookeeperStartExecutor);
+		LOG.warn(" >>> kafkaStartExecutor ...", kafkaStartExecutor);
 		if (kafkaStartExecutor != null) {
 			LOG.warn(" >>> shutdown kafkaStartExecutor .");
 
@@ -495,6 +495,13 @@ public class KafkaService {
 			LOG.error(">>> Error!!!, createTopic, msg={}, stacktrace={}", ExceptionUtils.getMessage(e), ExceptionUtils.getStackTrace(e));
 			throw e;
 		} 
+	}
+	public void deleteAllTopics() throws Exception {
+		Set<String> topicSet = listTopics();
+		
+		for (String topic : topicSet) {
+			deleteTopic(topic);
+		}
 	}
 	public void deleteTopic(String topic) throws Exception {
 		LOG.info(">>>>>>>>>>>> deleteTopic topic=={}", topic);
