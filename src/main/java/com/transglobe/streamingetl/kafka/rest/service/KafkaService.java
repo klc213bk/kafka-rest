@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PreDestroy;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -53,6 +54,9 @@ import com.transglobe.streamingetl.kafka.rest.bean.LastLogminerScn;
 public class KafkaService {
 	static final Logger LOG = LoggerFactory.getLogger(KafkaService.class);
 
+	static final int KAFKA_SERVER_PORT = 9092;
+	static final int ZOOKEEPER_SERVER_PORT = 2181;
+	
 	@Value("${kafka.server.home}")
 	private String kafkaServerHome;
 
@@ -126,19 +130,16 @@ public class KafkaService {
 					public void run() {
 						BufferedReader reader = new BufferedReader(new InputStreamReader(zookeeperStartProcess.getInputStream()));
 						reader.lines().forEach(line -> {
-							//							LOG.info("********"+line);
-							if (line.contains("Using checkIntervalMs")) {
-								zookeeperStartFinished.set(true);
-								LOG.info("********   zookeeperStartFinished set true");
-							} 
+							LOG.info("********"+line);
+						
 						});
 					}
 
 				});
 
-				while (!zookeeperStartFinished.get()) {
-					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
+				while (!checkPortListening(ZOOKEEPER_SERVER_PORT)) {
 					Thread.sleep(1000);
+					LOG.info(">>>> Sleep for 1 second");;
 				}
 
 				LOG.info(">>>>>>>>>>>> KafkaService.startZookeeper End");
@@ -171,25 +172,17 @@ public class KafkaService {
 					public void run() {
 						BufferedReader reader = new BufferedReader(new InputStreamReader(kafkaStartProcess.getInputStream()));
 						reader.lines().forEach(line -> {
-							//LOG.info("+++++"+line);
-							if (line.contains("started (kafka.server.KafkaServer)")) {
-								kafkaStartFinished.set(true);
-								LOG.info("+++++   kafkaStartFinished set true");
-							} else if (line.contains("shut down completed (kafka.server.KafkaServer)")) {
-								kafkaStopFinished.set(true);
-								LOG.info("+++++   kafkaStopFinished set true");
-							}
+							LOG.info(line);
+							
 						});
 					}
 
 				});
 
-				while (!kafkaStartFinished.get()) {
-					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
+				while (!checkPortListening(KAFKA_SERVER_PORT)) {
 					Thread.sleep(1000);
+					LOG.info(">>>> Sleep for 1 second");;
 				}
-
-
 				LOG.info(">>>>>>>>>>>> KafkaService.startKafka End");
 			} else {
 				LOG.warn(" >>> kafkaStartProcess is currently Running.");
@@ -222,9 +215,9 @@ public class KafkaService {
 					zookeeperStopFinished.set(true);
 				}
 
-				while (!zookeeperStopFinished.get()) {
-					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
+				while (checkPortListening(ZOOKEEPER_SERVER_PORT)) {
 					Thread.sleep(1000);
+					LOG.info(">>>> Sleep for 1 second");;
 				}
 
 				if (!zookeeperStopProcess.isAlive()) {
@@ -262,15 +255,10 @@ public class KafkaService {
 					kafkaStopFinished.set(true);
 				}
 				long t0 = System.currentTimeMillis();
-				while (!kafkaStopFinished.get()) {
-					LOG.info(">>>>>>WAITING 1 sec FOR FINISH");
+				
+				while (checkPortListening(KAFKA_SERVER_PORT)) {
 					Thread.sleep(1000);
-					
-					long t1 = System.currentTimeMillis();
-					
-					if ((t1 - t0) > 60 * 1000) {
-						break;
-					}
+					LOG.info(">>>> Sleep for 1 second");;
 				}
 
 				if (!kafkaStopProcess.isAlive()) {
@@ -648,7 +636,53 @@ public class KafkaService {
 		return consumer;
 	}
 	
-	
+	private boolean checkPortListening(int port) throws Exception {
+		LOG.info(">>>>>>>>>>>> checkPortListening:{} ", port);
+
+		BufferedReader reader = null;
+		try {
+			ProcessBuilder builder = new ProcessBuilder();
+			String script = "netstat -tnlp | grep :" + port;
+			builder.command("bash", "-c", script);
+			//				builder.command(kafkaTopicsScript + " --list --bootstrap-server " + kafkaBootstrapServer);
+
+			//				builder.command(kafkaTopicsScript, "--list", "--bootstrap-server", kafkaBootstrapServer);
+
+			builder.directory(new File("."));
+			Process checkPortProcess = builder.start();
+
+			AtomicBoolean portRunning = new AtomicBoolean(false);
+
+
+			int exitVal = checkPortProcess.waitFor();
+			if (exitVal == 0) {
+				reader = new BufferedReader(new InputStreamReader(checkPortProcess.getInputStream()));
+				reader.lines().forEach(line -> {
+					if (StringUtils.contains(line, "LISTEN")) {
+						portRunning.set(true);
+						LOG.info(">>> Success!!! portRunning.set(true)");
+					}
+				});
+				reader.close();
+
+				LOG.info(">>> Success!!! portRunning={}", portRunning.get());
+			} else {
+				LOG.error(">>> Error!!!  exitcode={}", exitVal);
+
+
+			}
+			if (checkPortProcess.isAlive()) {
+				checkPortProcess.destroy();
+			}
+
+			return portRunning.get();
+		} finally {
+			if (reader != null) reader.close();
+		}
+
+
+
+	}
 }
 //	@Value("${kafka.home}")
 //	private String kafkaHome;
