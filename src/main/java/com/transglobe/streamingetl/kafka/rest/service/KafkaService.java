@@ -183,6 +183,7 @@ public class KafkaService {
 					Thread.sleep(1000);
 					LOG.info(">>>> Sleep for 1 second");;
 				}
+				Thread.sleep(15000);
 				LOG.info(">>>>>>>>>>>> KafkaService.startKafka End");
 			} else {
 				LOG.warn(" >>> kafkaStartProcess is currently Running.");
